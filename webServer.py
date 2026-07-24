@@ -1,7 +1,7 @@
 import socket
 
-HOST = "172.16.85.93"
-PORT = 8081
+HOST = "localhost"
+PORT = 8080
 
 def createResponse(itemRequest):
     #Code 200 OK
@@ -34,5 +34,5 @@ while True:
 
     #create a response and send it to the client
     #check the request and formulate the correct response
-    clientSocket.send("test")
+    clientSocket.send("test".encode())
 
