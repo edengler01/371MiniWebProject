@@ -7,7 +7,6 @@ okRequest = ("GET / HTTP/1.1 \r\n"
 f"Host: {WEBSERVER_IP}\r\n"
 "\r\n"
              )
-print(okRequest)
 
 
 #Status Code 304: need if-modified-line
