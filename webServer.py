@@ -22,17 +22,34 @@ while True:
     clientSocket, clientAddr = server.accept()
 
     request = clientSocket.recv(4096).decode()
-    parsedRequest = request.split('\r\n')
+    print(f"Request Recieved \r\n {request}")
+
+    # read and store HTML file contents
+    with open("test.html", "rb") as file:
+        htmlData = file.read()
+
+    # create response header, hardcoded
+    responseHeader = (
+            "HTTP/1.1 200 OK \r\n"
+            "Content-Type: text/html \r\n"
+            f"Content-Length: {len(htmlData)}\r\n"
+            "Connection: close \r\n"
+            ).encode("utf-8")
+
+   # combine data from html file to response header 
+    clientSocket.sendall(responseHeader + htmlData)
+   # parsedRequest = request.split('\r\n')
+    
 
     #HTTP Get
-    print(parsedRequest[0])
+ #   print(parsedRequest[0])
     #what the client is trying to get
-    print(parsedRequest[1])
+#    print(parsedRequest[1])
 
 
 
 
     #create a response and send it to the client
     #check the request and formulate the correct response
-    clientSocket.send("test".encode())
+    #clientSocket.send("test".encode())
 

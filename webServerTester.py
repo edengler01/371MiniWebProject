@@ -1,22 +1,56 @@
-WEBSERVER_IP = 172.16.85.93
+import socket
+WEBSERVER_IP = "localhost"
 
 
 #Status Code 200
-okRequest = "GET / HTTP1.1 \r\n"+
-"Host: {WEBSERVER_IP}+\r\n"
-#Status Code 304
-notModifiedRequest = 
-    "GET / HTTP1.1 \r\n"+
-    "Host: {WEBSERVER_IP}" +
-    "If-Modified-Since: CURRENT DATE"
-#Status Code 403 Forbidden
-forbiddenRequestFail =     
-    "GET / HTTP1.1 \r\n"+
-    "Host: {WEBSERVER_IP}" +
-    "If-Modified-Since: CURRENT DATE"
+okRequest = ("GET / HTTP/1.1 \r\n"
+f"Host: {WEBSERVER_IP}\r\n"
+"\r\n"
+             )
+print(okRequest)
 
-#Status Code 505 HTTP Version not supported
-invalidHTTPVersion =     
-    "GET / HTTP1.1 \r\n"+
-    "Host: {WEBSERVER_IP}" +
-    "If-Modified-Since: CURRENT DATE"
+
+#Status Code 304: need if-modified-line
+conditionalRequest = (
+        "GET / HTTP/1.1 \r\n"
+        f"Host: {WEBSERVER_IP} \r\n"
+        "If-Modified-Since: Wed, 22 Jul 2026 18:30:00 GMT"
+        "\r\n"
+        )
+#Status Code 304: call proxy server
+conditionalRequestProxy = (
+        "GET / HTTP/1.1 \r\n"
+        f"Host: {WEBSERVER_IP} \r\n"
+        "If-Modified-Since: Wed, 22 Jul 2025 18:30:00 GMT"
+        "\r\n"
+        )
+
+#Status Code 403: forbidden
+forbiddenRequest = (
+        "GET /private/data.html HTTP /1.1 \r\n"
+        f"Host: {WEBSERVER_IP} \r\n"
+        "\r\n"
+        )
+
+#Status Code 404: File not found
+notFoundRequest = (
+        "GET /index2.html HTTP /1.1 \r\n"
+        f"Host: {WEBSERVER_IP} \r\n"
+        "\r\n"
+        )
+
+# Status Code 505 HTTP Version Not Supported
+httpNotSupportedRequest = (
+        "GET / HTTP/3.0 \r\n"
+        f"Host: {WEBSERVER_IP} \r\n"
+        "\r\n"
+        )
+
+
+clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+clientSocket.connect(('localhost',8080))
+clientSocket.send(okRequest.encode())
+
+response = clientSocket.recv(4096)
+print(response.decode())
+
