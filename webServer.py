@@ -38,18 +38,4 @@ while True:
 
    # combine data from html file to response header 
     clientSocket.sendall(responseHeader + htmlData)
-   # parsedRequest = request.split('\r\n')
-    
-
-    #HTTP Get
- #   print(parsedRequest[0])
-    #what the client is trying to get
-#    print(parsedRequest[1])
-
-
-
-
-    #create a response and send it to the client
-    #check the request and formulate the correct response
-    #clientSocket.send("test".encode())
 

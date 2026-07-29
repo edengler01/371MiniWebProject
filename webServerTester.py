@@ -3,7 +3,7 @@ WEBSERVER_IP = "localhost"
 
 
 #Status Code 200
-okRequest = ("GET / HTTP/1.1 \r\n"
+okRequest = ("GET /test.html HTTP/1.1 \r\n"
 f"Host: {WEBSERVER_IP}\r\n"
 "\r\n"
              )
@@ -47,7 +47,7 @@ httpNotSupportedRequest = (
 
 
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clientSocket.connect(('localhost',8080))
+clientSocket.connect(('localhost',9000))
 clientSocket.send(okRequest.encode())
 
 response = clientSocket.recv(4096)
