@@ -1,4 +1,5 @@
 import socket
+import os
 
 HOST = "localhost"
 PORT = 8080
@@ -20,22 +21,19 @@ server.listen()
 print(f"Listening on {HOST}: {PORT}")
 while True:
     clientSocket, clientAddr = server.accept()
-
+    print("Connection Recieved")
     request = clientSocket.recv(4096).decode()
-    print(f"Request Recieved \r\n {request}")
+    requestLine = request.split("\r\n")[0]
+    parts = requestLine.split()
+    requestFile = parts[1]
+    webServerPath = "webServer" + requestFile
+    if os.path.isfile(webServerPath):
+        with open(webServerPath, "rb") as file:
+            response = file.read()
+            response += b"\r\n Sent from the Web Server"
 
-    # read and store HTML file contents
-    with open("test.html", "rb") as file:
-        htmlData = file.read()
+    else:
+        print("Error")
 
-    # create response header, hardcoded
-    responseHeader = (
-            "HTTP/1.1 200 OK \r\n"
-            "Content-Type: text/html \r\n"
-            f"Content-Length: {len(htmlData)}\r\n"
-            "Connection: close \r\n"
-            ).encode("utf-8")
-
-   # combine data from html file to response header 
-    clientSocket.sendall(responseHeader + htmlData)
-
+    clientSocket.sendall(response)
+    clientSocket.close()

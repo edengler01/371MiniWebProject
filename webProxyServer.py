@@ -25,19 +25,25 @@ while True:
     cachePath = "cache" + requestFile
     if os.path.isfile(cachePath):
         print("This file exists, send it from here")
+        with open(cachePath, "rb") as file:
+            response = file.read()
+            response += b"\r\n Sent from Proxy Server"
     else:
         print("This file does not exist, ask the web server")
+        serverSocket=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        serverSocket.connect((destinationHost, destinationPort))
+        print(f"Request to web server is: \r\n {request}")
+        serverSocket.sendall(request)
+        response = serverSocket.recv(4096)
+        #create this file in the cache
 
-    serverSocket=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    serverSocket.connect((destinationHost, destinationPort))
-
-    serverSocket.sendall(request)
-
-    response = serverSocket.recv(4096)
+        #fileName = requestFile.lstrip("/")
+        f = open(cachePath,"x")
+        with open(cachePath,"w") as f:
+            f.write("This is a test to write to the updated Test HTML")
+        serverSocket.close()    
+    
 
     clientSocket.sendall(response)
-
-    serverSocket.close()
     clientSocket.close()
 
