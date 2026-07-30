@@ -4,6 +4,8 @@ import threading
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime, formatdate
 import os
+import base64
+
 
 #reference  https://www.geeksforgeeks.org/python/socket-programming-multi-threading-python/
 lock = threading.Lock()
@@ -37,7 +39,7 @@ def handle_client(clientSocket):
         # Request line
         requestLine = linesRequest[0].split(' ')
         # file path
-        filePath = requestLine[1]
+        filePath = requestLine[1].lstrip('/')
         # header lines
         headerLines = linesRequest[1:]
 
@@ -47,7 +49,6 @@ def handle_client(clientSocket):
 
         # 505 HTTP version not supported
         # check last item in request line for http version
-        #TODO
         if requestLine[-1] != 'HTTP/1.1':
             response = (
                 f"HTTP/1.1 505 HTTP Version Not Supported\r\n"
@@ -87,26 +88,42 @@ def handle_client(clientSocket):
 
         # 403 forbidden
         # if client trying to access private server, send 403
-        if "private" in filePath:
-            response = (
-                "HTTP/1.1 403 Forbidden\r\n"
-                f"Date: {httpDate}\r\n"
-                "Content-Length: 0\r\n\r\n"
-            )
-            clientSocket.sendall(response.encode("utf-8"))
-            continue
+        if "private/data.txt" in filePath:
+            auth_header = ""
+            for item in headerLines:
+                if item.startswith("Authorization: Basic "):
+                    auth_header = item
+
+            if not auth_header:
+                response = (
+                    "HTTP/1.1 403 Forbidden\r\n"
+                    f"Date: {httpDate}\r\n"
+                    "Content-Length: 0\r\n\r\n"
+                )
+                clientSocket.sendall(response.encode("utf-8"))
+                continue
+
+            
+            encoded = auth_header[21:].strip()
+            decoded = base64.b64decode(encoded).decode('utf-8')
+            if decoded != "user:password":
+                response = (
+                    "HTTP/1.1 403 Forbidden\r\n"
+                    f"Date: {httpDate}\r\n"
+                    "Content-Length: 0\r\n\r\n"
+                )
+                clientSocket.sendall(response.encode("utf-8"))
+                continue
 
         # 404 Not found
         # if the file doesn't exist, send 404
         if not os.path.exists(filePath):
-            error_body = b"404 Not Found"
             header = (
                 "HTTP/1.1 404 Not Found\r\n"
                 f"Date: {httpDate}\r\n"
-                f"Content-Length: {len(error_body)}\r\n"
-                "Content-Type: text/plain\r\n\r\n"
+                "Content-Length: 0\r\n\r\n"
             )
-            clientSocket.sendall(header.encode("utf-8") + error_body)
+            clientSocket.sendall(header.encode("utf-8"))
             continue
 
         #202 OK
@@ -119,22 +136,6 @@ def handle_client(clientSocket):
             "Content-Type: text/html; charset=utf-8\r\n\r\n"
         )
         clientSocket.sendall(header.encode("utf-8") + body)
-
-        '''
-        # determine which method is being requested
-        
-        match requestLine[0]:
-            case "GET":
-                print("GET")
-            case "POST":
-                print("POST")
-            case "HEAD":
-                print("HEAD")
-            case "PUT":
-                print("PUT")
-            case "DELETE":
-                print("DELETE")
-        '''
     clientSocket.close()
 
 def main():
