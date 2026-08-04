@@ -1,49 +1,81 @@
 import socket
 import os
+from _thread import start_new_thread
 
-HOST = "localhost"
-PORT = 9000
+HOST_PROXY = "localhost"
+HOST_PORT = 9000
 
-proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-proxy.bind((HOST,PORT))
-proxy.listen();
+SERVER_HOST = "localhost"
+SERVER_PORT = 8081
 
-print(f"Proxy listening on {HOST}:{PORT}")
+def handle_client(clientSocket):
+    try:
+        request = clientSocket.recv(4096)
 
-while True:
-    clientSocket, clientAddr = proxy.accept()
-    request = clientSocket.recv(4096)
-    print(request.decode)
-    destinationHost = HOST
-    destinationPort = 8080
+        #if request is garbled, return
+        if not request:
+            return
+
+        #split the request 
+        requestLine = request.decode("utf-8").split("\r\n")[0]
+        #split the get line to extract filepath
+        parts = requestLine.split()
+
+        #if the parts is less than 3, something went wrong
+        if len(parts) < 3:
+            return
+        
+        requestFile = parts[1]
+        #if there file is blank or just /, go to home page
+        if requestFile == "/":
+            requestFile ="/index.html"
+        cachePath = "cache" + requestFile
+        #check if the cache path is valid in current file system
+        if os.path.isfile(cachePath):
+            print("Cache hit")
+            with open(cachePath, "rb") as file:
+                response = file.read()
+        else:
+            print ("Cache miss")
+            serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                serverSocket.connect((SERVER_HOST, SERVER_PORT))
+                serverSocket.sendall(request)
+
+                responseChunks = []
+
+                while True:
+                    chunk = serverSocket.recv(4096)
+                    if not chunk:
+                        break
+                    responseChunks.append(chunk)
+                response = b"".join(responseChunks)
+            finally:
+                serverSocket.close()
+            # check response, if 200, store it in the cache
+            if response.startswith(b"HTTP/1.1 200 OK"):
+                with open(cachePath, "wb") as file:
+                    file.write(response)
+
+        clientSocket.sendall(response)
     
-    print(f"Request coming in to proxy is: \r\n {request}")
-    # split the request up into parts
-    requestLine = request.decode().split("\r\n")[0]
-    parts = requestLine.split()
-    requestFile = parts[1]
-    cachePath = "cache" + requestFile
-    if os.path.isfile(cachePath):
-        print("This file exists, send it from here")
-        with open(cachePath, "rb") as file:
-            response = file.read()
-            response += b"\r\n Sent from Proxy Server"
-    else:
-        print("This file does not exist, ask the web server")
-        serverSocket=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        serverSocket.connect((destinationHost, destinationPort))
-        print(f"Request to web server is: \r\n {request}")
-        serverSocket.sendall(request)
-        response = serverSocket.recv(4096)
-        #create this file in the cache
+    finally:
+        clientSocket.close()
 
-        #fileName = requestFile.lstrip("/")
-        f = open(cachePath,"x")
-        with open(cachePath,"w") as f:
-            f.write("This is a test to write to the updated Test HTML")
-        serverSocket.close()    
-    
+def main():
+    proxy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # prevent Address already in use, from: https://stackoverflow.com/questions/66627418/python-socket-oserror-errno-98-address-already-in-use
+    proxy.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    proxy.bind((HOST_PROXY, HOST_PORT))
+    proxy.listen(5)
 
-    clientSocket.sendall(response)
-    clientSocket.close()
+    print(f"Proxy listening on {HOST_PROXY}:{HOST_PORT}")
+    while True:
+        clientSocket, clientAddr = proxy.accept()
+        print(f"Client connected: {clientAddr}")
 
+        start_new_thread(
+            handle_client, (clientSocket,)
+        )
+if __name__ == "__main__":
+    main()
