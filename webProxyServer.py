@@ -46,17 +46,17 @@ def handle_client(clientSocket):
 
                 while True:
                     chunk = serverSocket.recv(4096)
-                    print(f"Received chunk: {len(chunk)} bytes")
-                    print(chunk)
+                    #print(f"Received chunk: {len(chunk)} bytes")
+                    #print(chunk)
                     if not chunk:
-                        print("Web server closed connection")
+                        #print("Web server closed connection")
                         break
                     responseChunks.append(chunk)
 
                 response = b"".join(responseChunks)
 
-                print(f"Cache path: {cachePath}")
-                print(f"Response starts with: {response[:100]}")
+                #print(f"Cache path: {cachePath}")
+                #print(f"Response starts with: {response[:100]}")
             finally:
                 serverSocket.close()
             # check response, if 200, store it in the cache
