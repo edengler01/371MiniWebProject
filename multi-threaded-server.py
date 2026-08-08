@@ -5,10 +5,18 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime, formatdate
 import os
 import base64
+from queue import Queue
+
+
+# Define frame size
+FRAME_SIZE = 1024
+# create shared queue for active framed responses
+# thread safe
+responseQueue = Queue()
 
 
 #reference  https://www.geeksforgeeks.org/python/socket-programming-multi-threading-python/
-lock = threading.Lock()
+# lock = threading.Lock()
 
 '''
 handle client requests
@@ -21,11 +29,36 @@ header lines\r\n
 payload (might not have)
 ---------------------
 '''
+
+
+
+# create a sender thread that:
+# wait until queue is not empty
+# Remove response at front of queue
+# Send one frame of data to front of the queue
+# If theres more frames to send, put response at end of queue
+# If no frame remains, close client socket
+def sender_thread():
+    while True:
+        clientSocket, frames = responseQueue.get()
+        frame = frames.pop(0)
+        print(f"Sending frame of size {len(frame)} bytes")
+        clientSocket.sendall(frame)
+        # if theres still frames leftover, it put back in the queue
+        if frames:
+            responseQueue.put((clientSocket,frames))
+        # no more frames, done, close it
+        else:
+            clientSocket.close()
+
+
+
 def handle_client(clientSocket):
     while True:
         request = clientSocket.recv(4096).decode()
         if not request:
-            lock.release()
+            clientSocket.close()
+           # lock.release()
             break
         
         # parse payout out of request
@@ -39,7 +72,9 @@ def handle_client(clientSocket):
         # Request line
         requestLine = linesRequest[0].split(' ')
         # file path
-        filePath = requestLine[1].lstrip('/')
+        requestFile = requestLine[1].lstrip('/')
+        filePath = "webServer/"+requestFile
+
         # header lines
         headerLines = linesRequest[1:]
 
@@ -57,7 +92,8 @@ def handle_client(clientSocket):
             )
 
             clientSocket.sendall(response.encode("utf-8"))
-            continue
+            clientSocket.close()
+            return
 
         # 304 Not Modified
         # check If-modified-since headerline
@@ -101,7 +137,9 @@ def handle_client(clientSocket):
                     "Content-Length: 0\r\n\r\n"
                 )
                 clientSocket.sendall(response.encode("utf-8"))
-                continue
+                clientSocket.close();
+                return
+                
 
             
             encoded = auth_header[21:].strip()
@@ -113,7 +151,8 @@ def handle_client(clientSocket):
                     "Content-Length: 0\r\n\r\n"
                 )
                 clientSocket.sendall(response.encode("utf-8"))
-                continue
+                clientSocket.close()
+                return
 
         # 404 Not found
         # if the file doesn't exist, send 404
@@ -124,9 +163,10 @@ def handle_client(clientSocket):
                 "Content-Length: 0\r\n\r\n"
             )
             clientSocket.sendall(header.encode("utf-8"))
-            continue
+            clientSocket.close()
+            return
 
-        #202 OK
+        #200 OK
         with open(filePath, "rb") as f:
             body = f.read()
         header = (
@@ -135,8 +175,18 @@ def handle_client(clientSocket):
             f"Date: {httpDate}\r\n"
             "Content-Type: text/html; charset=utf-8\r\n\r\n"
         )
-        clientSocket.sendall(header.encode("utf-8") + body)
-    clientSocket.close()
+        # Build HTTP response 
+        # Split response body into frame_size chunks
+        # First frame: response header
+        # add framed response to the shared response queue
+        # return from this handler so only sender thread sends the response
+        response = header.encode("utf-8")+body
+        frames = []
+        for i in range (0, len(response),FRAME_SIZE):
+            frames.append(response[i:i+FRAME_SIZE])
+        # Send it to sender thread
+        responseQueue.put((clientSocket,frames))
+        return;
 
 def main():
     HOST = ''
@@ -148,11 +198,15 @@ def main():
     server.listen(5)
 
     print(f"Listening on {HOST}: {PORT}")
+    # start a dedicated sender thread
+    start_new_thread(sender_thread, ())
+
     while True:
         clientSocket, clientAddr = server.accept()
 
-        lock.acquire()
+        #lock.acquire()
         start_new_thread(handle_client, (clientSocket,))
+        
         
 
 
