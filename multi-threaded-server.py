@@ -92,7 +92,8 @@ def handle_client(clientSocket):
             )
 
             clientSocket.sendall(response.encode("utf-8"))
-            continue
+            clientSocket.close()
+            return
 
         # 304 Not Modified
         # check If-modified-since headerline
@@ -136,7 +137,9 @@ def handle_client(clientSocket):
                     "Content-Length: 0\r\n\r\n"
                 )
                 clientSocket.sendall(response.encode("utf-8"))
-                continue
+                clientSocket.close();
+                return
+                
 
             
             encoded = auth_header[21:].strip()
@@ -148,7 +151,8 @@ def handle_client(clientSocket):
                     "Content-Length: 0\r\n\r\n"
                 )
                 clientSocket.sendall(response.encode("utf-8"))
-                continue
+                clientSocket.close()
+                return
 
         # 404 Not found
         # if the file doesn't exist, send 404
@@ -159,7 +163,8 @@ def handle_client(clientSocket):
                 "Content-Length: 0\r\n\r\n"
             )
             clientSocket.sendall(header.encode("utf-8"))
-            continue
+            clientSocket.close()
+            return
 
         #200 OK
         with open(filePath, "rb") as f:
@@ -172,7 +177,7 @@ def handle_client(clientSocket):
         )
         # Build HTTP response 
         # Split response body into frame_size chunks
-        # First frame: response
+        # First frame: response header
         # add framed response to the shared response queue
         # return from this handler so only sender thread sends the response
         response = header.encode("utf-8")+body
