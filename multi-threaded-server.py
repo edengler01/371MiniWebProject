@@ -42,7 +42,7 @@ def sender_thread():
     while True:
         clientSocket, frames = responseQueue.get()
         frame = frames.pop(0)
-        print(f"Sending frame of size {len(frame)} bytes")
+        #print(f"Sending frame of size {len(frame)} bytes")
         clientSocket.sendall(frame)
         # if theres still frames leftover, it put back in the queue
         if frames:
@@ -95,33 +95,19 @@ def handle_client(clientSocket):
             clientSocket.close()
             return
 
-        # 304 Not Modified
-        # check If-modified-since headerline
-        # if it is equal to or newer than file's modified date then send reponse
+        # 404 Not found
+        # if the file doesn't exist, send 404
+        if not os.path.exists(filePath):
+            header = (
+                "HTTP/1.1 404 Not Found\r\n"
+                f"Date: {httpDate}\r\n"
+                "Content-Length: 0\r\n\r\n"
+            )
+            clientSocket.sendall(header.encode("utf-8"))
+            clientSocket.close()
+            return
 
-        #find the If-Modified-Since line
-        modifiedSince = "If-Modified-Since"
-        modifiedSinceHeaderLine = ""
-        for item in headerLines:
-            if item[:len(modifiedSince)] == modifiedSince:
-                modifiedSinceHeaderLine = item
-
-        # if it exists, find the date and check it with the file    
-        if len(modifiedSinceHeaderLine) != 0:
-            # If-Modified-Since: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
-            clientDate = modifiedSinceHeaderLine[len("If-Modified-Since: "):]
-            fileMtime = os.path.getmtime(filePath)
-            fileTimestamp = datetime.fromtimestamp(fileMtime, timezone.utc).replace( microsecond=0 )
-            headerTime = parsedate_to_datetime(clientDate)
-
-            if fileTimestamp < headerTime:
-                response = (
-                    "HTTP/1.1 304 Not Modified\r\n"
-                    f"Date: {httpDate}\r\n\r\n"
-                )
-                clientSocket.sendall(response.encode("utf-8"))
-                continue
-
+        
         # 403 forbidden
         # if client trying to access private server, send 403
         if "private/data.txt" in filePath:
@@ -154,25 +140,47 @@ def handle_client(clientSocket):
                 clientSocket.close()
                 return
 
-        # 404 Not found
-        # if the file doesn't exist, send 404
-        if not os.path.exists(filePath):
-            header = (
-                "HTTP/1.1 404 Not Found\r\n"
-                f"Date: {httpDate}\r\n"
-                "Content-Length: 0\r\n\r\n"
-            )
-            clientSocket.sendall(header.encode("utf-8"))
-            clientSocket.close()
-            return
+
+
+
+        # 304 Not Modified
+        # check If-modified-since headerline
+        # if it is equal to or newer than file's modified date then send reponse
+
+        #find the If-Modified-Since line
+        modifiedSince = "If-Modified-Since"
+        modifiedSinceHeaderLine = ""
+        for item in headerLines:
+            if item[:len(modifiedSince)] == modifiedSince:
+                modifiedSinceHeaderLine = item
+
+        # if it exists, find the date and check it with the file    
+        if len(modifiedSinceHeaderLine) != 0:
+            # If-Modified-Since: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
+            clientDate = modifiedSinceHeaderLine[len("If-Modified-Since: "):]
+            fileMtime = os.path.getmtime(filePath)
+            fileTimestamp = datetime.fromtimestamp(fileMtime, timezone.utc).replace( microsecond=0 )
+            headerTime = parsedate_to_datetime(clientDate)
+
+            if fileTimestamp <= headerTime:
+                response = (
+                    "HTTP/1.1 304 Not Modified\r\n"
+                    f"Date: {httpDate}\r\n\r\n"
+                )
+                clientSocket.sendall(response.encode("utf-8"))
+                clientSocket.close()
+                return
 
         #200 OK
+        fileMtime = os.path.getmtime(filePath)
+        lastModified = formatdate(fileMtime,usegmt=True)
         with open(filePath, "rb") as f:
             body = f.read()
         header = (
             "HTTP/1.1 200 OK\r\n"
             f"Content-Length: {len(body)}\r\n"
             f"Date: {httpDate}\r\n"
+            f"Last-Modified: {lastModified}\r\n"
             "Content-Type: text/html; charset=utf-8\r\n\r\n"
         )
         # Build HTTP response 
